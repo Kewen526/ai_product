@@ -4,7 +4,7 @@ set -e
 GITHUB_API="https://api.github.com/repos/Kewen526/ai_product/tarball/main"
 APP_DIR="/opt/ai_product"
 SERVICE_NAME="ai_product"
-PORT=8000
+PORT=8001
 UVICORN=/usr/local/bin/uvicorn
 
 echo "===> 1. 安装系统依赖"
