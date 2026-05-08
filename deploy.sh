@@ -6,13 +6,25 @@ APP_DIR="/opt/ai_product"
 SERVICE_NAME="ai_product"
 PORT=8000
 
-echo "===> 1. 安装系统依赖"
+echo "===> 1. 安装系统依赖（含 Python 3.9）"
 if command -v apt-get &>/dev/null; then
     apt-get update -y
-    apt-get install -y python3 python3-pip python3-venv git
+    apt-get install -y python3.9 python3.9-venv python3-pip git
 elif command -v yum &>/dev/null; then
-    yum install -y python3 python3-pip git
+    yum install -y python39 python39-pip git
 fi
+
+# 确定可用的 Python 3.9+ 可执行文件
+if command -v python3.9 &>/dev/null; then
+    PYTHON=python3.9
+elif command -v python3.11 &>/dev/null; then
+    PYTHON=python3.11
+elif command -v python3 &>/dev/null; then
+    PYTHON=python3
+else
+    echo "❌ 未找到 Python 3，请手动安装 python3.9+" && exit 1
+fi
+echo "使用 Python：$($PYTHON --version)"
 
 echo "===> 2. 拉取代码"
 if [ -d "$APP_DIR/.git" ]; then
@@ -23,7 +35,7 @@ fi
 
 echo "===> 3. 安装 Python 依赖"
 cd "$APP_DIR/backend"
-python3 -m venv .venv
+$PYTHON -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
