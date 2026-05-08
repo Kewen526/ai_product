@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote_plus
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_HOST = os.getenv("DB_HOST", "47.104.72.198")
@@ -7,8 +8,9 @@ DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "Kewen888@")
 DB_NAME = os.getenv("DB_NAME", "ai_product")
 
+# quote_plus encodes special chars like '@' in the password to avoid URL parsing errors
 DATABASE_URL = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    f"mysql+pymysql://{DB_USER}:{quote_plus(DB_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     "?charset=utf8mb4"
 )
 
