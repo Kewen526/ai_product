@@ -1,13 +1,13 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from database import get_db
-from models import DailyImagePool, ImageTag
+from models import DailyImagePool
 from routers.auth import get_current_user
 from services.sync import run_sync
 
@@ -33,7 +33,7 @@ class ImageOut(BaseModel):
     source: str
     is_locked: bool
     created_at: datetime
-    tags: list[TagOut]
+    tags: List[TagOut]
 
     model_config = {"from_attributes": True}
 
@@ -58,7 +58,7 @@ def sync_today(
     return SyncResult(**result)
 
 
-@router.get("", response_model=list[ImageOut])
+@router.get("", response_model=List[ImageOut])
 def list_images(
     query_date: Optional[date] = Query(default=None, alias="date", description="Filter by date, defaults to today"),
     factory_code: Optional[str] = Query(default=None, description="Filter by factory code tag"),
@@ -75,10 +75,9 @@ def list_images(
         .order_by(DailyImagePool.id)
     )
 
-    images = db.scalars(stmt).all()
+    images = list(db.scalars(stmt).all())
 
     if factory_code:
-        # keep only images that have at least one tag matching the factory_code
         images = [
             img for img in images
             if any(t.factory_code == factory_code for t in img.tags)
@@ -87,12 +86,11 @@ def list_images(
     return images
 
 
-@router.get("/dates", response_model=list[date])
+@router.get("/dates", response_model=List[date])
 def list_dates(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    """Return all dates that have images, for frontend date-group navigation."""
     rows = db.scalars(
         select(DailyImagePool.date).distinct().order_by(DailyImagePool.date.desc())
     ).all()

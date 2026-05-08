@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -17,15 +18,15 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 class TagCreate(BaseModel):
     image_id: int
     factory_code: str
-    amount: str | None = None
-    tag_date: date | None = None  # defaults to today if omitted
+    amount: Optional[str] = None
+    tag_date: Optional[date] = None
 
 
 class TagOut(BaseModel):
     id: int
     image_id: int
     factory_code: str
-    amount: str | None
+    amount: Optional[str]
     tag_date: date
     created_at: datetime
 
@@ -69,10 +70,10 @@ def delete_tag(
     db.commit()
 
 
-@router.get("", response_model=list[TagOut])
+@router.get("", response_model=List[TagOut])
 def list_tags(
-    factory_code: str | None = Query(default=None),
-    tag_date: date | None = Query(default=None),
+    factory_code: Optional[str] = Query(default=None),
+    tag_date: Optional[date] = Query(default=None),
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
@@ -85,12 +86,11 @@ def list_tags(
     return db.scalars(stmt).all()
 
 
-@router.get("/factory-codes", response_model=list[str])
+@router.get("/factory-codes", response_model=List[str])
 def list_factory_codes(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    """Return all distinct factory codes (for filter dropdowns)."""
     rows = db.scalars(
         select(ImageTag.factory_code).distinct().order_by(ImageTag.factory_code)
     ).all()

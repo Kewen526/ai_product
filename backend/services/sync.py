@@ -12,11 +12,11 @@ Flow:
 
 import io
 import json
-import os
 import random
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
+from typing import List, Optional, Set
 
 import requests
 from sqlalchemy import func, select
@@ -47,7 +47,7 @@ def _is_day_locked(db: Session, day: date) -> bool:
     ) > 0
 
 
-def _existing_urls(db: Session, day: date) -> set[str]:
+def _existing_urls(db: Session, day: date) -> Set[str]:
     rows = db.scalars(
         select(DailyImagePool.image_url).where(DailyImagePool.date == day)
     ).all()
@@ -56,8 +56,7 @@ def _existing_urls(db: Session, day: date) -> set[str]:
 
 # ── ZIP download & extract ────────────────────────────────────────────────────
 
-def _download_and_extract_zip(zip_url: str, dest_dir: Path, source_id: int) -> list[str]:
-    """Download a ZIP from COS and extract images. Returns list of relative URLs."""
+def _download_and_extract_zip(zip_url: str, dest_dir: Path, source_id: int) -> List[str]:
     try:
         resp = requests.get(zip_url, timeout=120)
         resp.raise_for_status()
@@ -65,17 +64,15 @@ def _download_and_extract_zip(zip_url: str, dest_dir: Path, source_id: int) -> l
         print(f"[sync] Failed to download {zip_url}: {e}")
         return []
 
-    extracted_urls: list[str] = []
+    extracted_urls: List[str] = []
     try:
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             for member in zf.namelist():
                 lower = member.lower()
                 if lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
-                    # flatten directory structure; prefix with source_id to avoid collisions
                     filename = f"{source_id}_{Path(member).name}"
                     target = dest_dir / filename
                     target.write_bytes(zf.read(member))
-                    # URL exposed via /static/uploads/<date>/<filename>
                     relative = f"/static/uploads/{dest_dir.name}/{filename}"
                     extracted_urls.append(relative)
     except Exception as e:
@@ -86,7 +83,7 @@ def _download_and_extract_zip(zip_url: str, dest_dir: Path, source_id: int) -> l
 
 # ── ai_tasks parsing ──────────────────────────────────────────────────────────
 
-def _parse_result_images(raw: str | None) -> list[str]:
+def _parse_result_images(raw: Optional[str]) -> List[str]:
     if not raw:
         return []
     try:
@@ -98,7 +95,7 @@ def _parse_result_images(raw: str | None) -> list[str]:
 
 # ── core sync ─────────────────────────────────────────────────────────────────
 
-def run_sync(db: Session, day: date | None = None) -> dict:
+def run_sync(db: Session, day: Optional[date] = None) -> dict:
     if day is None:
         day = _today()
 
@@ -107,7 +104,7 @@ def run_sync(db: Session, day: date | None = None) -> dict:
 
     existing = _existing_urls(db, day)
     dest_dir = _day_upload_dir(day)
-    new_records: list[DailyImagePool] = []
+    new_records: List[DailyImagePool] = []
 
     # ── source 1: cos_upload_records ─────────────────────────────────────────
     cos_rows = db.scalars(
@@ -120,7 +117,6 @@ def run_sync(db: Session, day: date | None = None) -> dict:
     for row in cos_rows:
         url: str = row.finish_url.strip()
         if not url.lower().endswith(".zip"):
-            # treat as direct image URL
             if url not in existing:
                 new_records.append(DailyImagePool(
                     date=day, image_url=url, source="cos_zip", source_id=row.id
@@ -148,7 +144,7 @@ def run_sync(db: Session, day: date | None = None) -> dict:
                 new_records.append(DailyImagePool(
                     date=day, image_url=img_url, source="ai_task", source_id=row.id
                 ))
-                existing.add(img_url)  # prevent duplicates within this sync run
+                existing.add(img_url)
 
     if not new_records:
         current_count = db.scalar(
@@ -162,15 +158,14 @@ def run_sync(db: Session, day: date | None = None) -> dict:
         }
 
     db.add_all(new_records)
-    db.flush()  # assign IDs before potential deletion
+    db.flush()
 
     total_count = db.scalar(
         select(func.count()).where(DailyImagePool.date == day)
     )
 
     if total_count >= DAILY_IMAGE_LIMIT:
-        # Fetch all IDs for this day, randomly keep DAILY_IMAGE_LIMIT, lock them
-        all_ids: list[int] = list(db.scalars(
+        all_ids: List[int] = list(db.scalars(
             select(DailyImagePool.id).where(DailyImagePool.date == day)
         ).all())
 
