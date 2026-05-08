@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from datetime import datetime, date
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import (
     Integer, String, Boolean, Date, DateTime, Text,
-    ForeignKey, Numeric, func,
+    ForeignKey, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,13 +45,12 @@ class DailyImagePool(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
-    # 'cos_zip' = came from cos_upload_records ZIP; 'ai_task' = came from ai_tasks
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     source_id: Mapped[Optional[int]] = mapped_column(Integer)
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    tags: Mapped[list["ImageTag"]] = relationship(
+    tags: Mapped[List[ImageTag]] = relationship(
         "ImageTag", back_populates="image", cascade="all, delete-orphan"
     )
 
@@ -66,4 +67,4 @@ class ImageTag(Base):
     tag_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    image: Mapped["DailyImagePool"] = relationship("DailyImagePool", back_populates="tags")
+    image: Mapped[DailyImagePool] = relationship("DailyImagePool", back_populates="tags")
